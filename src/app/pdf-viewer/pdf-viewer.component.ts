@@ -29,16 +29,20 @@ import { createEventBus } from '../utils/event-bus-utils';
 let PDFJS: any;
 let PDFJSViewer: any;
 
+declare let pdfjsLib;
+declare let pdfjsViewer;
+let loadingDeps = false;
+
 function isSSR() {
   return typeof window === 'undefined';
 }
 
-if (!isSSR()) {
-  PDFJS = require('pdfjs-dist/build/pdf');
-  PDFJSViewer = require('pdfjs-dist/web/pdf_viewer');
+// if (!isSSR()) {
+//   PDFJS = require('pdfjs-dist/build/pdf');
+//   PDFJSViewer = require('pdfjs-dist/web/pdf_viewer');
 
-  PDFJS.verbosity = PDFJS.VerbosityLevel.ERRORS;
-}
+//   PDFJS.verbosity = PDFJS.VerbosityLevel.ERRORS;
+// }
 
 export enum RenderTextMode {
   DISABLED,
@@ -220,25 +224,6 @@ export class PdfViewerComponent
   }
 
   constructor(private element: ElementRef) {
-    if (isSSR()) {
-      return;
-    }
-
-    let pdfWorkerSrc: string;
-
-    if (
-      window.hasOwnProperty('pdfWorkerSrc') &&
-      typeof (window as any).pdfWorkerSrc === 'string' &&
-      (window as any).pdfWorkerSrc
-    ) {
-      pdfWorkerSrc = (window as any).pdfWorkerSrc;
-    } else {
-      pdfWorkerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${
-        (PDFJS as any).version
-      }/pdf.worker.min.js`;
-    }
-
-    (PDFJS as any).GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
   }
 
   ngAfterViewChecked(): void {
@@ -265,9 +250,54 @@ export class PdfViewerComponent
 
   ngOnInit() {
     if (!isSSR() && this.isVisible) {
-      this.isInitialized = true;
-      this.setupMultiPageViewer();
-      this.setupSinglePageViewer();
+      if (typeof pdfjsLib === 'undefined' && !loadingDeps) {
+        loadingDeps = true;
+
+        const check = () => {
+          if (typeof pdfjsLib !== 'undefined' && typeof pdfjsViewer !== 'undefined') {
+            PDFJS = pdfjsLib;
+            PDFJSViewer = pdfjsViewer;
+            PDFJS.verbosity = PDFJS.VerbosityLevel.ERRORS;
+
+            let pdfWorkerSrc: string;
+
+            if (
+              window.hasOwnProperty('pdfWorkerSrc') &&
+              typeof (window as any).pdfWorkerSrc === 'string' &&
+              (window as any).pdfWorkerSrc
+            ) {
+              pdfWorkerSrc = (window as any).pdfWorkerSrc;
+            } else {
+              pdfWorkerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${
+                (PDFJS as any).version
+              }/pdf.worker.min.js`;
+            }
+
+            (PDFJS as any).GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
+
+            this.isInitialized = true;
+            this.setupMultiPageViewer();
+            this.setupSinglePageViewer();
+
+            this.ngOnChanges({ src: this.src } as any);
+          }
+        };
+
+        const s1 = document.createElement('script');
+        s1.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.2.228/pdf.min.js';
+        s1.onload = () => {
+          const s2 = document.createElement('script');
+          s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.2.228/pdf_viewer.js';
+          s2.onload = check;
+          document.body.appendChild(s2);
+        };
+        document.body.appendChild(s1);
+      } else {
+        this.isInitialized = true;
+        this.setupMultiPageViewer();
+        this.setupSinglePageViewer();
+        this.ngOnChanges({ src: this.src } as any);
+      }
     }
   }
 
@@ -309,6 +339,10 @@ export class PdfViewerComponent
   }
 
   ngOnChanges(changes: SimpleChanges) {
+    if (typeof pdfjsLib === 'undefined' || typeof pdfjsViewer === 'undefined') {
+      return;
+    }
+
     if (isSSR() || !this.isVisible) {
       return;
     }
