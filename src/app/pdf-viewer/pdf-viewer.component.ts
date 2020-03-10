@@ -37,13 +37,6 @@ function isSSR() {
   return typeof window === 'undefined';
 }
 
-// if (!isSSR()) {
-//   PDFJS = require('pdfjs-dist/build/pdf');
-//   PDFJSViewer = require('pdfjs-dist/web/pdf_viewer');
-
-//   PDFJS.verbosity = PDFJS.VerbosityLevel.ERRORS;
-// }
-
 export enum RenderTextMode {
   DISABLED,
   ENABLED,
